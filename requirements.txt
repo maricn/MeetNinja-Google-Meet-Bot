@@ -4,3 +4,4 @@ datetime 	# for scheduling & timestamps
 pause		# for scheduling
 colorama 	# for colors
 termcolor 	# for colors
+google-api-python-client

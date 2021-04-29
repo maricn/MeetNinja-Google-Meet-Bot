@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from selenium import webdriver; import requests
+from selenium.webdriver.remote.utils import dump_json
 from selenium.webdriver.support import expected_conditions as when
 from selenium.webdriver.common.by import By as by
 from selenium.webdriver.common.action_chains import ActionChains
@@ -8,22 +9,24 @@ from selenium.webdriver.common.keys import Keys
 import pause; import os; import re
 import time; from datetime import datetime
 import colorama; from termcolor import colored
+from googleapiclient.discovery import build
 
 colorama.init()
 
 ###################################################################
 #                        Meets                  HH:MM:SS DD/MM/YYYY
-MEETS = {"1 https://meet.google.com/meetURL1": "23:59:59 31/12/2020",
-         "2 https://meet.google.com/meetURL2": "23:59:59 31/12/2020",
-         "3 https://meet.google.com/meetURL3": "23:59:59 31/12/2020",
-         "4 https://meet.google.com/meetURL4": "23:59:59 31/12/2020",
+# MEETS = {"1 https://meet.google.com/fdb-ftby-qmc": "2021-04-29T22:45:00+02:00",
+         # "2 https://meet.google.com/meetURL2": "23:59:59 31/12/2020",
+         # "3 https://meet.google.com/meetURL3": "23:59:59 31/12/2020",
+         # "4 https://meet.google.com/meetURL4": "23:59:59 31/12/2020",
          # Add more Meet URLs (if any) using the same format as above
-         }
+         # }
 
-DURATION = 60 # Duration of each Meet in minutes
-USERNAME = "emailaddress@gmail.com"
-PASSWORD = "passw0rd"
-BROWSER_DRIVER = "Browser Driver Path Goes Here (options below)"
+DURATION_MINS = 60 # Duration of each Meet in minutes
+USERNAME = "nikola.maric@mimi.io"
+PASSWORD = "bapqjocnlqadbqxn"
+BROWSER_DRIVER = "chromedriver"
+# BROWSER_DRIVER = "./ChromeDrivers/linux64/chromedriver"
 
 #                   Google Chrome
 #           Linux: "ChromeDrivers/linux64/chromedriver"
@@ -48,7 +51,7 @@ joinButton2Path = "//span[contains(text(), 'Ask to join')]"
 endButtonPath = "[aria-label='Leave call']"
 
 currentVersionNumber = "v3.0.0"
-VERSION_CHECK_URL = "https://raw.githubusercontent.com/SHUR1K-N/MeetNinja-Google-Meet-Bot/master/versionfile.txt"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/maricn/MeetNinja-Google-Meet-Bot/master/versionfile.txt"
 BANNER1 = colored('''
    ███▄ ▄███▓▓█████ ▓█████▄▄▄█████▓ ███▄    █  ██▓ ███▄    █  ▄▄▄██▀▀▀▄▄▄
   ▓██▒▀█▀ ██▒▓█   ▀ ▓█   ▀▓  ██▒ ▓▒ ██ ▀█   █ ▓██▒ ██ ▀█   █    ▒██  ▒████▄
@@ -85,7 +88,7 @@ def versionCheck():
         print(colored(" You are using the latest version!\n", "green"))
     elif currentVersionNumber < latestVersionNumber:
         print(colored(" You are using an older version of MeetNinja.", "red"))
-        print(colored("Get the latest version at https://github.com/SHUR1K-N/MeetNinja-Google-Meet-Bot", "yellow"))
+        print(colored("Get the latest version at https://github.com/maricn/MeetNinja-Google-Meet-Bot", "yellow"))
         print(colored("Every new version comes with fixes, improvements, new features, etc..", "yellow"))
         print(colored("Please do not open an Issue if you see this message and have not yet tried the latest version.", "yellow"))
 
@@ -106,13 +109,15 @@ def timeStamp():
 
 def initBrowser():
     print("\nInitializing browser...", end="")
-    if BROWSER_DRIVER.lower().startswith("chrome"):
+    if BROWSER_DRIVER.lower().startswith("chrom"):
         chromeOptions = webdriver.ChromeOptions()
         chromeOptions.add_argument("--disable-infobars")
         chromeOptions.add_argument("--disable-gpu")
         chromeOptions.add_argument("--disable-extensions")
         chromeOptions.add_argument("--window-size=800,800")
-        chromeOptions.add_argument("--incognito")
+        # chromeOptions.add_argument("--incognito")
+        chromeOptions.add_argument("--disable-blink-features=AutomationControlled")
+        chromeOptions.add_argument("user-data-dir=./profile/")
         chromeOptions.add_experimental_option('excludeSwitches', ['enable-logging'])
         chromeOptions.add_experimental_option("prefs", {"profile.default_content_setting_values.media_stream_mic": 2,
                                                         "profile.default_content_setting_values.media_stream_camera": 2,
@@ -120,7 +125,7 @@ def initBrowser():
                                                         })
         driver = webdriver.Chrome(executable_path=BROWSER_DRIVER, options=chromeOptions)
 
-    elif BROWSER_DRIVER.lower().startswith("firefox"):
+    elif (BROWSER_DRIVER.lower().startswith("firefox") or BROWSER_DRIVER.lower().startswith("gecko")):
         firefoxOptions = webdriver.FirefoxOptions()
         firefoxOptions.add_argument("--width=800"), firefoxOptions.add_argument("--height=800")
         # firefoxOptions.headless = True
@@ -129,8 +134,37 @@ def initBrowser():
         firefoxOptions.set_preference("permissions.default.microphone", 2)
         firefoxOptions.set_preference("permissions.default.camera", 2)
         driver = webdriver.Firefox(executable_path=BROWSER_DRIVER, options=firefoxOptions)
+
     print(colored(" Success!", "green"))
     return(driver)
+
+
+def getMeetings(since: datetime):
+    calendarService = build('calendar', 'v3', client_options={ 'credentials_file': '/home/nikola/.google-credentials.json' })
+    calendarEventsResponse = calendarService.events().list(
+            calendarId='nikola.maric@mimi.io', 
+            maxResults=20, 
+            timeMin=since.strftime('%Y-%m-%dT%H:%M:%S+02:00')
+    ).execute()
+    # calendarEventsResponse = requests.get(
+    #     'https://www.googleapis.com/calendar/v3/calendars/calendarId/events',
+    #     { 
+    #         'timeMin': timeMin,
+    #         'maxResults': 20
+    #     }
+    # ).json()
+    allEvents = calendarEventsResponse["items"]
+    confirmedEvents = list(map(
+        lambda event: event.get("start", {}).get("dateTime", None) + "#" + event.get("hangoutLink", None),
+        list(filter(
+            lambda ev: 
+                ev.get("status", None) == "confirmed" and ev.get("hangoutLink", None) is not None
+            , 
+            allEvents
+        ))
+    ))
+    print(confirmedEvents)
+    return confirmedEvents
 
 
 def login():
@@ -154,17 +188,22 @@ def login():
     print(colored(" Success!", "green"))
 
 
-def attendMeet():
+def attendMeet(URL: str):
     print(f"\n\nNavigating to Google Meet #{meetIndex}...", end="")
-    driver.get(URL[2:])
+    driver.get(URL)
     print(colored(" Success!", "green"))
+
+    print(f"Turning off microphone and camera...")
+    turnOffMicCam()
+    print(f"Turned off microphone and camera.")
+
     print(f"Entering Google Meet #{meetIndex}...", end="")
 
     try:
         joinButton = wait.until(when.element_to_be_clickable((by.XPATH, joinButton1Path)))
     except:
         joinButton = wait.until(when.element_to_be_clickable((by.XPATH, joinButton2Path)))
-    if BROWSER_DRIVER.lower().startswith("chrome"):
+    if BROWSER_DRIVER.lower().startswith("chrom"):
         time.sleep(1)
         action.send_keys(Keys.ESCAPE).perform()
     time.sleep(1)
@@ -180,6 +219,24 @@ def attendMeet():
         joinButton.click()
     except:
         pass
+
+
+# explicit function to turn off mic and cam
+def turnOffMicCam():
+  
+    # turn off Microphone
+    time.sleep(2)
+    driver.find_element_by_xpath(
+        '/html/body/div[1]/c-wiz/div/div/div[9]/div[3]/div/div/div[2]/div/div[1]/div[1]/div[1]/div/div[4]/div[1]/div/div/div').click()
+        # '//*[@id="yDmH0d"]/c-wiz/div/div/div[8]/div[3]/div/div/div[2]/div/div[1]/div[1]/div[1]/div/div[4]/div[1]/div/div/div').click()
+    driver.implicitly_wait(3000)
+  
+    # turn off camera
+    time.sleep(1)
+    driver.find_element_by_xpath(
+        '/html/body/div[1]/c-wiz/div/div/div[9]/div[3]/div/div/div[2]/div/div[1]/div[1]/div[1]/div/div[4]/div[2]/div/div').click()
+        # '//*[@id="yDmH0d"]/c-wiz/div/div/div[8]/div[3]/div/div/div[2]/div/div[1]/div[1]/div[1]/div/div[4]/div[2]/div/div').click()
+    driver.implicitly_wait(3000)
 
 
 def endMeet():
@@ -218,12 +275,6 @@ def clrscr():
     printBanner()
 
 
-def hibernate():
-    print("\nHibernating in 10 seconds. Press Ctrl + C to abort.")
-    time.sleep(13)
-    _ = os.system('shutdown /h /f')
-
-
 ############### Main ###############
 
 if __name__ == "__main__":
@@ -233,26 +284,29 @@ if __name__ == "__main__":
     versionCheck()
 
     try:
-        DURATION *= 60
         driver = initBrowser()
         wait = webdriver.support.ui.WebDriverWait(driver, 5)
         action = ActionChains(driver)
-        for meetIndex, (URL, rawTime) in enumerate(MEETS.items(), start=1):
-            startTime = fixTimeFormat(rawTime)
+
+        meetings = getMeetings(datetime.now())
+        for meetIndex, meeting in enumerate(meetings):
+            (rawTime, URL) = meeting.split('#')
             if (meetIndex <= 1):
                 print(colored(f"Waiting until first Meet start time [{rawTime}]...", "yellow"), end="")
             else:
                 print(colored(f"\n\nWaiting until next Meet start time [{rawTime}]...", "yellow"), end="")
-            pause.until(datetime(*startTime))
+            meetStartsAt = datetime.strptime(rawTime, '%Y-%m-%dT%H:%M:%S%z')
+            # @TODO: maricn - actually we shouldn't pause that long, but should recheck occasionally to detect if 
+            #  an event had been created in the meantime
+            pause.until(meetStartsAt)
             print(colored(" Started!", "green"))
-            if (meetIndex <= 1):
-                login()
-            attendMeet()
-            time.sleep(DURATION)
+            # @TODO: maricn - find out if you're logged in or not - if not, disturb and ask user to login manually
+            # if (meetIndex <= 1):
+                # login()
+            attendMeet(URL)
+            # time.sleep(DURATION_MINS * 60)
             endMeet()
         print("\n\nAll Meets completed successfully.")
-        # hibernate()
-        # Uncomment above to hibernate after a 10 second countdown upon completion of all Meets (Ctrl + C to abort hibernation)
         print("Press Enter to exit.")
         input()
         print("\nCleaning up and exiting...", end="")
