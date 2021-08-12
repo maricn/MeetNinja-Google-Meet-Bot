@@ -1,10 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from selenium import webdriver; import requests
 from selenium.webdriver.remote.utils import dump_json
 from selenium.webdriver.support import expected_conditions as when
 from selenium.webdriver.common.by import By as by
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.keys import Keys
 import pause; import os; import re
 import time; from datetime import datetime
@@ -23,14 +24,14 @@ colorama.init()
          # }
 
 DURATION_MINS = 60 # Duration of each Meet in minutes
-USERNAME = "nikola.maric@mimi.io"
-PASSWORD = "bapqjocnlqadbqxn"
-BROWSER_DRIVER = "chromedriver"
-# BROWSER_DRIVER = "./ChromeDrivers/linux64/chromedriver"
+USERNAME = "emailaddress@gmail.com"
+PASSWORD = "passw0rd"
+BROWSER_DRIVER = "Browser Driver Path Goes Here (options below)"
 
 #                   Google Chrome
 #           Linux: "ChromeDrivers/linux64/chromedriver"
 #             Mac: "ChromeDrivers/mac64/chromedriver"
+#        Mac (M1): "ChromeDrivers/mac64_m1/chromedriver"
 #         Windows: "ChromeDrivers/win32/chromedriver.exe"
 
 #                   Mozilla Firefox
@@ -39,7 +40,7 @@ BROWSER_DRIVER = "chromedriver"
 #             Mac: "FirefoxDrivers/mac64/geckodriver"
 #   Windows (x32): "FirefoxDrivers/win32/geckodriver.exe"
 #   Windows (x64): "FirefoxDrivers/win64/geckodriver.exe"
-###################################################################
+##################################################################
 
 # All required interactive elements' locators (text fields, buttons, etc.)
 usernameFieldPath = "identifierId"
@@ -50,8 +51,8 @@ joinButton1Path = "//span[contains(text(), 'Join')]"
 joinButton2Path = "//span[contains(text(), 'Ask to join')]"
 endButtonPath = "[aria-label='Leave call']"
 
-currentVersionNumber = "v3.0.0"
-VERSION_CHECK_URL = "https://raw.githubusercontent.com/maricn/MeetNinja-Google-Meet-Bot/master/versionfile.txt"
+currentVersionNumber = "v3.1.1"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/SHUR1K-N/MeetNinja-Google-Meet-Bot/master/versionfile.txt"
 BANNER1 = colored('''
    ███▄ ▄███▓▓█████ ▓█████▄▄▄█████▓ ███▄    █  ██▓ ███▄    █  ▄▄▄██▀▀▀▄▄▄
   ▓██▒▀█▀ ██▒▓█   ▀ ▓█   ▀▓  ██▒ ▓▒ ██ ▀█   █ ▓██▒ ██ ▀█   █    ▒██  ▒████▄
@@ -88,7 +89,7 @@ def versionCheck():
         print(colored(" You are using the latest version!\n", "green"))
     elif currentVersionNumber < latestVersionNumber:
         print(colored(" You are using an older version of MeetNinja.", "red"))
-        print(colored("Get the latest version at https://github.com/maricn/MeetNinja-Google-Meet-Bot", "yellow"))
+        print(colored("\nGet the latest version at https://github.com/SHUR1K-N/MeetNinja-Google-Meet-Bot", "yellow"))
         print(colored("Every new version comes with fixes, improvements, new features, etc..", "yellow"))
         print(colored("Please do not open an Issue if you see this message and have not yet tried the latest version.", "yellow"))
 
@@ -123,7 +124,11 @@ def initBrowser():
                                                         "profile.default_content_setting_values.media_stream_camera": 2,
                                                         "profile.default_content_setting_values.notifications": 2
                                                         })
-        driver = webdriver.Chrome(executable_path=BROWSER_DRIVER, options=chromeOptions)
+        if BROWSER_DRIVER.lower().endswith(".exe"):
+            driver = webdriver.Chrome(executable_path=BROWSER_DRIVER, options=chromeOptions)
+        else:
+            servicePath = Service(BROWSER_DRIVER)
+            driver = webdriver.Chrome(service=servicePath, options=chromeOptions)
 
     elif (BROWSER_DRIVER.lower().startswith("firefox") or BROWSER_DRIVER.lower().startswith("gecko")):
         firefoxOptions = webdriver.FirefoxOptions()
@@ -133,8 +138,11 @@ def initBrowser():
         firefoxOptions.set_preference("browser.privatebrowsing.autostart", True)
         firefoxOptions.set_preference("permissions.default.microphone", 2)
         firefoxOptions.set_preference("permissions.default.camera", 2)
-        driver = webdriver.Firefox(executable_path=BROWSER_DRIVER, options=firefoxOptions)
-
+        if BROWSER_DRIVER.lower().endswith(".exe"):
+            driver = webdriver.Firefox(executable_path=BROWSER_DRIVER, options=firefoxOptions)
+        else:
+            servicePath = Service(BROWSER_DRIVER)
+            driver = webdriver.Firefox(service=servicePath, options=firefoxOptions)
     print(colored(" Success!", "green"))
     return(driver)
 
@@ -251,6 +259,7 @@ def genericError():
     print("\n\nPossible fixes:\n")
     print("1.1 Make sure you have downloaded the latest version of MeetNinja from the GitHub page (every new iteration brings fixes and new capabilities)")
     print("1.2 Make sure you have pip-installed all the required python packages mentioned in the README")
+    print("1.3 UNIX-based systems (Linux / Mac): Make sure you have given all the contents of MeetNinja the correct permissions (eg: 'chmod 777 ./ -R')")
     print("2.1 Check your inputs and run MeetNinja again (make sure there are no leading zeros in the Meet start times)")
     print("2.2 And / Or make sure you have chosen the correct webdriver file respective of your web browser and operating system")
     print("3. Make sure the generated web browser is not \"Minimized\" while MeetNinja is working")
@@ -285,7 +294,7 @@ if __name__ == "__main__":
 
     try:
         driver = initBrowser()
-        wait = webdriver.support.ui.WebDriverWait(driver, 5)
+        wait = webdriver.support.ui.WebDriverWait(driver, 7)
         action = ActionChains(driver)
 
         meetings = getMeetings(datetime.now())
